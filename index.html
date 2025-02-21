@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple web app for computing grade averages from Excel files. Upload your spreadsheet to see grade distributions per marker.">
+    <meta name="author" content="Dr Alex Shaw 2025">
+    <title>Grade Analysis Tool</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .popup { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+                 background: white; padding: 20px; border: 1px solid #ccc; box-shadow: 0px 0px 10px #aaa; }
+        .popup.active { display: block; }
+        .popup button { margin-top: 10px; }
+        .instructions-button { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Grade Analysis Tool</h1>
+    
+    <!-- Instructions Popup -->
+    <button class="instructions-button" onclick="showPopup()">Instructions</button>
+    <div id="instructionsPopup" class="popup">
+        <h2>How to Use</h2>
+        <p>Upload an Excel file (.xlsx or .xls) with at least two columns:</p>
+        <ul>
+            <li><strong>Marker</strong>: Name or ID of the marker</li>
+            <li><strong>Grade</strong>: Numeric student grade (0-100)</li>
+        </ul>
+        <p>Ensure column headers are exactly <code>Marker</code> and <code>Grade</code> for correct processing.</p>
+        <p>Written by Alex.</p>
+        <button onclick="closePopup()">Close</button>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        function GradeAnalysisApp() {
+            const [data, setData] = React.useState(null);
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const binaryStr = e.target.result;
+                    const workbook = XLSX.read(binaryStr, { type: "binary" });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet);
+                    processGrades(jsonData);
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            const processGrades = (jsonData) => {
+                let results = {};
+                jsonData.forEach((row) => {
+                    const marker = row["Marker"];
+                    const grade = row["Grade"];
+
+                    if (!marker || isNaN(grade)) return;
+
+                    if (!results[marker]) {
+                        results[marker] = { first: 0, twoOne: 0, twoTwo: 0, third: 0, fail: 0, total: 0 };
+                    }
+
+                    results[marker].total++;
+                    if (grade >= 70) results[marker].first++;
+                    else if (grade >= 60) results[marker].twoOne++;
+                    else if (grade >= 50) results[marker].twoTwo++;
+                    else if (grade >= 40) results[marker].third++;
+                    else results[marker].fail++;
+                });
+                setData(results);
+            };
+
+            return (
+                <div>
+                    <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} />
+                    {data && (
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Marker</th>
+                                    <th>Firsts</th>
+                                    <th>2.1</th>
+                                    <th>2.2</th>
+                                    <th>Third</th>
+                                    <th>Fail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Object.entries(data).map(([marker, stats]) => (
+                                    <tr key={marker}>
+                                        <td>{marker}</td>
+                                        <td>{`${stats.first} (${((stats.first / stats.total) * 100).toFixed(1)}%)`}</td>
+                                        <td>{`${stats.twoOne} (${((stats.twoOne / stats.total) * 100).toFixed(1)}%)`}</td>
+                                        <td>{`${stats.twoTwo} (${((stats.twoTwo / stats.total) * 100).toFixed(1)}%)`}</td>
+                                        <td>{`${stats.third} (${((stats.third / stats.total) * 100).toFixed(1)}%)`}</td>
+                                        <td>{`${stats.fail} (${((stats.fail / stats.total) * 100).toFixed(1)}%)`}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<GradeAnalysisApp />, document.getElementById("root"));
+
+        // Functions for popup behavior
+        function showPopup() {
+            document.getElementById("instructionsPopup").classList.add("active");
+        }
+
+        function closePopup() {
+            document.getElementById("instructionsPopup").classList.remove("active");
+        }
+    </script>
+</body>
+</html>
